@@ -1,29 +1,16 @@
-# dags/churn.py
-import pendulum
-from airflow.decorators import dag, task
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+import pandas as pd
+from airflow.models import BaseOperator 
+from airflow.utils.dates import days_ago
 
-@dag(
-    schedule='@once',
-    start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
-    catchup=False,
-    tags=["ETL"]
-)
-
-def prepare_churn_dataset():
-    import pandas as pd
-    import numpy as np
-    from airflow.providers.postgres.hooks.postgres import PostgresHook
-   
-    
-    @task()
-    def create_table():
+def create_table():
         import sqlalchemy
         from sqlalchemy import Table, MetaData, Column, Integer, String, Float, DateTime, UniqueConstraint, inspect
         hook = PostgresHook('destination_db')
         db_conn = hook.get_sqlalchemy_engine()
         metadata = MetaData()
-        users_churn = Table(
-                        'users_churn',
+        alter_users_churn = Table(
+                        'alter_users_churn',
                          metadata,
                         Column('id', Integer, primary_key=True, autoincrement=True),
                         Column('customer_id', String),
@@ -50,14 +37,25 @@ def prepare_churn_dataset():
                         UniqueConstraint('customer_id', name='unique_customer_constraint')
                                 ) 
  
-        if not inspect(db_conn).has_table(users_churn.name): 
-            metadata.create_all(db_conn)
+        #if not inspect(db_conn).has_table(alt_users_churn.name): 
+        metadata.create_all(db_conn)
 
-    @task()
-    def extract(**kwargs):
-        hook = PostgresHook('source_db')
-        conn = hook.get_conn()
-        sql = f"""
+
+def transform(**kwargs):
+    """
+    #### Transform task
+    """
+    ti = kwargs['ti'] # получение объекта task_instance
+    data = ti.xcom_pull(task_ids='extract', key='extracted_data') # выгрузка данных из task_instance
+    data['target'] = (data['end_date'] != 'No').astype(int) # логика функции
+    data['end_date'].replace({'No': None}, inplace=True)
+    ti.xcom_push('transformed_data', data) # вместо return отправляем данные передатчику task_instance 
+
+def extract(**kwargs):
+	# ваш код здесь #
+    hook = PostgresHook('source_db')
+    conn = hook.get_conn()
+    sql = f"""
         select
             c.customer_id, c.begin_date, c.end_date, c.type, c.paperless_billing, c.payment_method, c.monthly_charges, c.total_charges,
             i.internet_service, i.online_security, i.online_backup, i.device_protection, i.tech_support, i.streaming_tv, i.streaming_movies,
@@ -68,29 +66,22 @@ def prepare_churn_dataset():
         left join personal as p on p.customer_id = c.customer_id
         left join phone as ph on ph.customer_id = c.customer_id
         """
-        data = pd.read_sql(sql, conn)
-        conn.close()
-        return data
+    data = pd.read_sql(sql, conn)
+    conn.close()
+    ti = kwargs['ti']
+    ti.xcom_push('extracted_data', data)
 
-    @task()
-    def transform(data: pd.DataFrame):
-        data['target'] = (data['end_date'] != 'No').astype(int)
-        data['end_date'].replace({'No': None}, inplace=True)
-        return data
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-    @task()
-    def load(data: pd.DataFrame):
-        hook = PostgresHook('destination_db')
-        hook.insert_rows(
-            table="users_churn",
+def load(**kwargs):
+    # ваш код здесь #
+    ti = kwargs['ti'] # получение объекта task_instance
+    data = ti.xcom_pull(task_ids='transform', key='transformed_data') # выгрузка данных из task_instance
+    hook = PostgresHook('destination_db')
+    hook.insert_rows(table="alter_users_churn",
             replace=True,
             target_fields=data.columns.tolist(),
             replace_index=['customer_id'],
             rows=data.values.tolist()
-    )
+    ) 
 
-    create_table()
-    data = extract()
-    transformed_data = transform(data)
-    load(transformed_data)
-prepare_churn_dataset()

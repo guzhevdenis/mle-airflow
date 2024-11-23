@@ -2,42 +2,45 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 from airflow.models import BaseOperator 
 from airflow.utils.dates import days_ago
+from airflow import DAG
 
+
+     
 def create_table():
-        import sqlalchemy
-        from sqlalchemy import Table, MetaData, Column, Integer, String, Float, DateTime, UniqueConstraint, inspect
-        hook = PostgresHook('destination_db')
-        db_conn = hook.get_sqlalchemy_engine()
-        metadata = MetaData()
-        alter_users_churn = Table(
-                        'alter_users_churn',
-                         metadata,
-                        Column('id', Integer, primary_key=True, autoincrement=True),
-                        Column('customer_id', String),
-                        Column('begin_date', DateTime),
-                        Column('end_date', DateTime),
-                        Column('type', String),
-                        Column('paperless_billing', String),
-                        Column('payment_method', String),
-                        Column('monthly_charges', Float),
-                        Column('total_charges', Float),
-                        Column('internet_service', String),
-                        Column('online_security', String),
-                        Column('online_backup', String),
-                        Column('device_protection', String), 
-                        Column('tech_support', String),
-                        Column('streaming_tv', String),
-                        Column('streaming_movies', String), 
-                        Column('gender', String),
-                        Column('senior_citizen', Integer),
-                        Column('partner', String),
-                        Column('dependents', String),
-                        Column('multiple_lines', String),
-                        Column('target', Integer),
-                        UniqueConstraint('customer_id', name='unique_customer_constraint')
+    import sqlalchemy
+    from sqlalchemy import Table, MetaData, Column, Integer, String, Float, DateTime, UniqueConstraint, inspect
+    hook = PostgresHook('destination_db')
+    db_conn = hook.get_sqlalchemy_engine()
+    metadata = MetaData()
+    alt_users_churn = Table(
+                    'alt_users_churn',
+                    metadata,
+                    Column('id', Integer, primary_key=True, autoincrement=True),
+                    Column('customer_id', String),
+                    Column('begin_date', DateTime),
+                    Column('end_date', DateTime),
+                    Column('type', String),
+                    Column('paperless_billing', String),
+                    Column('payment_method', String),
+                    Column('monthly_charges', Float),
+                    Column('total_charges', Float),
+                    Column('internet_service', String),
+                    Column('online_security', String),
+                    Column('online_backup', String),
+                    Column('device_protection', String), 
+                    Column('tech_support', String),
+                    Column('streaming_tv', String),
+                    Column('streaming_movies', String), 
+                    Column('gender', String),
+                    Column('senior_citizen', Integer),
+                    Column('partner', String),
+                    Column('dependents', String),
+                    Column('multiple_lines', String),
+                    Column('target', Integer),
+                    UniqueConstraint('customer_id', name='alt_unique_customer_constraint',  extend_existing=True)
                                 ) 
  
-        #if not inspect(db_conn).has_table(alt_users_churn.name): 
+    if not inspect(db_conn).has_table(alt_users_churn.name): 
         metadata.create_all(db_conn)
 
 
@@ -78,7 +81,7 @@ def load(**kwargs):
     ti = kwargs['ti'] # получение объекта task_instance
     data = ti.xcom_pull(task_ids='transform', key='transformed_data') # выгрузка данных из task_instance
     hook = PostgresHook('destination_db')
-    hook.insert_rows(table="alter_users_churn",
+    hook.insert_rows(table="alt_users_churn",
             replace=True,
             target_fields=data.columns.tolist(),
             replace_index=['customer_id'],

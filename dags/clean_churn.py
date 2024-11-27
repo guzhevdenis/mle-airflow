@@ -101,13 +101,14 @@ def clean_churn_dataset():
         data = remove_outliers(data)
         data = remove_duplicates(data)
         data = fill_missing_values(data)
-        
+        data['target'] = (data['end_date'] != 'No').astype(int)
         
         return data
 
     @task()
     def load(data: pd.DataFrame):
         hook = PostgresHook('destination_db')
+        
         data['end_date'] = pd.to_datetime(data['end_date'], errors='coerce')
         data['end_date'] = data['end_date'].astype('object').replace(np.nan, None)
         hook.insert_rows(

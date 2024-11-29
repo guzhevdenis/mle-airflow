@@ -1,6 +1,6 @@
 index_col: 'customer_id'
 target_col: 'target'
-one_hot_drop: 'if_binary'
+one_hot_drop: 'first'
 auto_class_weights: 'Balanced'
 n_splits: 5
 metrics: ['f1', 'roc_auc']

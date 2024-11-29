@@ -2,10 +2,8 @@
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from category_encoders import CatBoostEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from catboost import CatBoostClassifier
 import yaml
 import os
 import joblib
